@@ -32,8 +32,8 @@ Returns the center of gravity of the wing, with `self` either Wing or
 WingSystem.
 """
 function get_CG(self)
-  sum_A = zero(eltype(self._HSs[1]))
-  sum_rA = zeros(eltype(self._HSs[1]), 3)
+  sum_A = 0.0
+  sum_rA = fill(0.0, 3)
   # Iterates over each panel
   for i in 1:get_m(self)
     r = get_r(self, i)
@@ -49,9 +49,8 @@ end
   Returns the mean chord length of a Wing or WingSystem
 """
 function get_barc(self)
-  TF = eltype(eltype(self._HSs))
-  sum_lA = zero(TF)
-  sum_A = zero(TF)
+  sum_lA = 0.0
+  sum_A = 0.0
 
   # Iterates over each panel
   for i in 1:get_m(self)
@@ -433,7 +432,7 @@ Generates a simple wing with constant twist, sweep, dihedral, and taper ratio.
 *   `r`       :   (float) horseshoes' expansion ratio
 """
 function simpleWing(b::FWrap, ar::FWrap, tr::FWrap,
-                    twist::FWrap, lambda::FWrap, gamma::FWrap, TF_trajectory=Float64;
+                    twist::FWrap, lambda::FWrap, gamma::FWrap;
                     twist_tip=nothing,
                     n::IWrap=20, r::FWrap=2.0, central=false, refinement=[])
   cr = 1/tr
@@ -451,7 +450,7 @@ function simpleWing(b::FWrap, ar::FWrap, tr::FWrap,
     push!(_ref, [refinement[i][1], refinement[i][2], 1/refinement[i][3]])
   end
 
-  wing = Wing(x_tip, -y_tip, z_tip, c_tip, twist_t, TF_trajectory)
+  wing = Wing(x_tip, -y_tip, z_tip, c_tip, twist_t)
   addchord(wing, 0.0, 0.0, 0.0, c_root, twist, n;
               r=r, central=central, refinement=_ref)
   addchord(wing, x_tip, y_tip, z_tip, c_tip, twist_t, n;
@@ -467,7 +466,7 @@ end
 tapper). Give it `elliptic="twist"` to get an elliptic twist distribution,
 otherwise it will build an elliptic chord distribution.
 """
-function ellipticWing(b::FWrap, croot::FWrap, twistroot::FWrap, TF_trajectory=Float64; elliptic="chord",
+function ellipticWing(b::FWrap, croot::FWrap, twistroot::FWrap; elliptic="chord",
                     n::IWrap=20, r::FWrap=1/2.0, central=false, refinement=[],
                     chordalign::FWrap=0.25)
 
@@ -507,7 +506,7 @@ function ellipticWing(b::FWrap, croot::FWrap, twistroot::FWrap, TF_trajectory=Fl
   LE_zs = chordalign*chords.*sin.(twists*pi/180)
 
   # Builds wing
-  wing = Wing(LE_xs[end], -LE_ys[end], LE_zs[end], chords[end], chords[end], TF_trajectory)
+  wing = Wing(LE_xs[end], -LE_ys[end], LE_zs[end], chords[end], chords[end])
   for (xs, ys, zs, chs, tws) in [reverse.([LE_xs, -LE_ys, LE_zs, chords, twists]),
                                                 [LE_xs, LE_ys, LE_zs, chords, twists]]
     for (i,y) in enumerate(ys)
@@ -563,9 +562,9 @@ dihed = [2.0, 5.0, 7.5]     # (deg) dihedral between stations
 wing = vlm.complexWing(b, AR, n, pos, clen, twist, sweep, dihed)
 ```
 """
-function complexWing(b::FWrap, AR::FWrap, n::IWrap, pos::Vector{<:FWrap},
-                      clen::Vector{<:FWrap}, twist::Vector{<:FWrap},
-                      sweep::Vector{<:FWrap}, dihed::Vector{<:FWrap}, TF_trajectory=Float64;
+function complexWing(b::FWrap, AR::FWrap, n::IWrap, pos::FArrWrap,
+                      clen::FArrWrap, twist::FArrWrap,
+                      sweep::FArrWrap, dihed::FArrWrap;
                       symmetric::Bool=true, chordalign::FWrap=0.0,
                       _ign1=false)
 
@@ -599,10 +598,7 @@ function complexWing(b::FWrap, AR::FWrap, n::IWrap, pos::Vector{<:FWrap},
   # Iterates over chords calculating coordinates
   prev_x = chordalign*chord_tip*clen[1]*cos(twist[1]*pi/180)
   prev_z = -chordalign*chord_tip*clen[1]*sin(twist[1]*pi/180)
-  TF = promote_type(typeof(b),eltype(pos),eltype(sweep),eltype(dihed))
-  prev_y = zero(TF)
-  sec_lambda = zero(TF)
-  sec_gamma = zero(TF)
+  prev_y, sec_lambda, sec_gamma = fill(0.0, 4)
   for i in 1:nchords
       cho_twist = twist[i]*pi/180       # Chord twist
       cho_len = chord_tip*clen[i]       # Chord length
@@ -648,7 +644,7 @@ function complexWing(b::FWrap, AR::FWrap, n::IWrap, pos::Vector{<:FWrap},
   end
 
   # ------------------- BUILD WING ---------------------------------------------
-  wing = Wing(xs[1], ys[1], zs[1], cs[1], twists[1], TF_trajectory)
+  wing = Wing(xs[1], ys[1], zs[1], cs[1], twists[1])
   for i in 2:(symmetric ? 2*nchords-1 : nchords)
     addchord(wing, xs[i], ys[i], zs[i], cs[i], twists[i], ns[i-1] )
   end
@@ -982,15 +978,14 @@ Receives the i', j', k' unit vectors of an euclidean system with origin T, and
 returns V'. (In this version, the unit vectors have been organized as a matrix
 M)
 """
-function transform(V::Vector{<:FWrap},
-                    M::Matrix{<:FWrap}, T::Vector{<:FWrap})
+function transform(V::FArrWrap,
+                    M::FMWrap, T::FArrWrap)
   return M*(V-T)
 end
 
-function transform(Vs::Array{TV,1} where {TV<:AbstractArray},
-                    M::Matrix{<:FWrap}, T::Vector{<:FWrap})
-  TF = promote_type(eltype(eltype(Vs)), eltype(M), eltype(T))
-  out = Vector{TF}[]
+function transform(Vs::Array{T,1} where {T<:AbstractArray},
+                    M::FMWrap, T::FArrWrap)
+  out = FArrWrap[]
   for V in Vs
     push!(out, transform(V, M, T))
   end
@@ -1003,14 +998,13 @@ into the system (i', j', k') with origin T, and returns the original V.
 To ease repetitive computation, instead of giving the unit vectors, give the
 inverse of their matrix.
 """
-function countertransform(Vp::Vector{<:FWrap}, invM::Matrix{<:FWrap}, T::Vector{<:FWrap})
+function countertransform(Vp::FArrWrap, invM::FMWrap, T::FArrWrap)
   return invM*Vp + T
 end
 
 function countertransform(Vps::Array{T,1} where {T<:AbstractArray},
-                            invM::Matrix{<:FWrap}, T::Vector{<:FWrap})
-  TF = promote_type(eltype(eltype(Vps)), eltype(invM), eltype(T))
-  out = Vector{TF}[]
+                            invM::FMWrap, T::FArrWrap)
+  out = FArrWrap[]
   for Vp in Vps
     push!(out, countertransform(Vp, invM, T))
   end
@@ -1019,7 +1013,7 @@ end
 
 "Checks that the unit vectors given as the matrix M=[i;j;k] define a coordinate
 system"
-function check_coord_sys(M::Matrix{<:FWrap}; raise_error::Bool=true)
+function check_coord_sys(M::FMWrap; raise_error::Bool=true)
   # Checks normalization
   for i in 1:size(M)[1]
     if abs(norm(M[i,:])-1) > 0.00000001
@@ -1050,32 +1044,31 @@ end
 
 function check_coord_sys(M::Array{T,1} where {T<:AbstractArray}; raise_error::Bool=true)
   dims = 3
-#   ad_flag = false             # Flag of automatic differentiation detected
-#   ad_type = nothing           # AD dual number type
+  ad_flag = false             # Flag of automatic differentiation detected
+  ad_type = nothing           # AD dual number type
 
-#   # Checks for automatic differentiation
-#   for i in 1:dims
-#     elem_type = eltype(M[i])
-#     if !(supertype(elem_type) in [AbstractFloat, Signed])
-#       # Case that AD was already detected: Checks for consistency of type
-#       if ad_flag
-#         if ad_type!=elem_type
-#           error("Fail to recognize AD dual number type: Found more than one"*
-#                   " ($ad_type, $elem_type)")
-#         end
-#       else
-#         ad_flag = true
-#         ad_type = elem_type
-#       end
-#     end
-#   end
+  # Checks for automatic differentiation
+  for i in 1:dims
+    elem_type = eltype(M[i])
+    if !(supertype(elem_type) in [AbstractFloat, Signed])
+      # Case that AD was already detected: Checks for consistency of type
+      if ad_flag
+        if ad_type!=elem_type
+          error("Fail to recognize AD dual number type: Found more than one"*
+                  " ($ad_type, $elem_type)")
+        end
+      else
+        ad_flag = true
+        ad_type = elem_type
+      end
+    end
+  end
 
-#   if ad_flag
-#     newM = fill(zero(ad_type), dims, dims)
-#   else
-#     newM = fill(zero(FWrap), dims, dims)
-#   end
-  newM = zeros(eltype(M), dims, dims)
+  if ad_flag
+    newM = fill(zero(ad_type), dims, dims)
+  else
+    newM = fill(zero(FWrap), dims, dims)
+  end
 
   for i in 1:dims
     newM[i, :] = M[i]

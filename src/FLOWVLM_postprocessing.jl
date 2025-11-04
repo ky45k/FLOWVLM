@@ -176,7 +176,7 @@ function _calculate_forces(wing, rhoinf::FWrap;
   # Iterates over horseshoes
   for i in 1:m
     Ap, A, B, Bp, CP, infDA, infDB, Gamma = getHorseshoe(wing, i)
-    force = zeros(promote_type(typeof(rhoinf), typeof(Gamma), eltype(Ap), eltype(A), eltype(B), eltype(Bp)), 3)
+    force = fill(0.0, 3)
 
     # Iterates over bound vortices of the horseshoe
     for BV in [[A,B], [Ap,A], [B,Bp]]
@@ -272,16 +272,14 @@ end
 "Calculates the force induced by the wake sheet assuming it planar in the
 direction of Vinf. This method works well only for an isolated lifting surface
 and should not be used on interacting lifting surfaces."
-function calculate_force_trefftz(wing, Vinf::Vector{<:FWrap}, rho::FWrap;
+function calculate_force_trefftz(wing, Vinf::FArrWrap, rho::FWrap;
                                         per_unit_span::Bool=false)
   HSs = getHorseshoes(wing)
   m = get_m(wing)
 
   DVinf = Vinf/norm(Vinf)
 
-  TF = promote_type(eltype(HSs[1]),eltype(DVinf))
-
-  Vinds = zeros(TF, m)   # Vortex sheet induced velocity at each bound vortex
+  Vinds = fill(zero(FWrap), m)   # Vortex sheet induced velocity at each bound vortex
   for i in 1:m  # Iterates over semi-infinite vortices calculating Vind
 
     if i==1 || HSs[i-1][3]!=HSs[i][2]
@@ -327,7 +325,7 @@ function calculate_force_trefftz(wing, Vinf::Vector{<:FWrap}, rho::FWrap;
   end
 
 
-  F = [zeros(TF, 3) for i in 1:m]
+  F = FArrWrap[fill(0.0, 3) for i in 1:m]
   for i in 1:m  # Iterates over bound vortex calculating induced force
     _, A, B, _, _, _, _, Gamma  = HSs[i]
     AB = B-A
@@ -346,7 +344,7 @@ end
 
 "Returns the average Vinf from all control points"
 function _aveVinf(wing; t::FWrap=0.0)
-  Vinf = zeros(typeof(t), 3)
+  Vinf = fill(0.0, 3)
   for i in 1:get_m(wing)
     Vinf += wing.Vinf(getControlPoint(wing, i), t)
   end

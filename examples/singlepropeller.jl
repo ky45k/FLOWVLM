@@ -14,7 +14,7 @@ end
 
 global propeller = nothing
 
-function singlepropeller(; save_path="temp_singlepropeller/")
+function singlepropeller(; save_path="/home/kweon/vlm/")
 
   # ---------------- GEOMETRIC PARAMETERS -------------------------
   CW = true                         # Clockwise rotation
